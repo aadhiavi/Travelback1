@@ -146,14 +146,17 @@ app.post('/api/upload', upload.single('file'), (req, res) => {
         });
 });
 
-//fetch images
+// Fetch images
 app.get('/api/images', async (req, res) => {
     try {
         const images = await Image.find();
-        const imagesWithUrls = images.map(image => ({
-            id: image._id,
-            url: `http://${req.headers.host}/uploads/${image.image}`
-        }));
+        const imagesWithUrls = images.map(image => {
+            const imageUrl = process.env.BASE_URL || `http://${req.headers.host}/uploads/${image.image}`;
+            return {
+                id: image._id,
+                url: imageUrl
+            };
+        });
         res.json(imagesWithUrls);
     } catch (err) {
         console.error(err);
@@ -161,7 +164,7 @@ app.get('/api/images', async (req, res) => {
     }
 });
 
-//remove an image
+// Remove an image
 app.delete('/api/images/:id', async (req, res) => {
     try {
         const image = await Image.findById(req.params.id);
@@ -185,9 +188,10 @@ app.delete('/api/images/:id', async (req, res) => {
     }
 });
 
-//uploaded files
+// Serve uploaded files
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
 
