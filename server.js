@@ -18,7 +18,7 @@ if (!fs.existsSync(uploadDir)) {
 // Middleware
 app.use(express.json());
 app.use(cors({
-    origin: process.env.CLIENT_URL || 'https://suhanadtour.netlify.app/',
+    origin: '*',
     credentials: true,
 }));
 
