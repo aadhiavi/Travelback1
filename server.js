@@ -6,28 +6,19 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 require('dotenv').config();
+const ImageRoutes = require('./routes/imageRoutes');
 
 const app = express();
-
-// Create the uploads directory if it doesn't exist
-const uploadDir = path.join(__dirname, 'uploads');
-if (!fs.existsSync(uploadDir)) {
-    fs.mkdirSync(uploadDir);
-}
-
-// Middleware
 app.use(express.json());
 app.use(cors({
     origin: '*',
     credentials: true,
 }));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// MongoDB Connection
 mongoose.connect(process.env.MONGO_URI)
     .then(() => console.log('MongoDB connected'))
     .catch(err => console.error('MongoDB connection error:', err));
-
-// Define the Entry schema and model
 const entrySchema = new mongoose.Schema({
     name: { type: String, required: true },
     phone: { type: String, required: true },
@@ -38,12 +29,6 @@ const entrySchema = new mongoose.Schema({
 
 const Entry = mongoose.model('Entry', entrySchema);
 
-// Define the Image schema and model
-const imageSchema = new mongoose.Schema({
-    image: String
-});
-const Image = mongoose.model('Image', imageSchema);
-
 // Nodemailer Transporter Setup
 const transporter = nodemailer.createTransport({
     service: 'gmail',
@@ -52,18 +37,6 @@ const transporter = nodemailer.createTransport({
         pass: process.env.EMAIL_PASS
     }
 });
-
-// Multer setup for file uploading
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, 'uploads/');
-    },
-    filename: (req, file, cb) => {
-        cb(null, `${file.fieldname}_${Date.now()}${path.extname(file.originalname)}`);
-    }
-});
-
-const upload = multer({ storage });
 
 // Add Entry
 app.post('/api/add-entry', async (req, res) => {
@@ -133,64 +106,8 @@ app.delete('/api/delete-entry/:id', async (req, res) => {
     }
 });
 
-// Upload Image
-app.post('/api/upload', upload.single('file'), (req, res) => {
-    const newImage = new Image({
-        image: req.file.filename
-    });
+app.use('/api/auth', ImageRoutes);
 
-    newImage.save()
-        .then(result => res.json(result))
-        .catch(err => {
-            console.error(err);
-            res.status(500).json({ error: 'Failed to save image' });
-        });
-});
-
-// Fetch Images
-app.get('/api/images', async (req, res) => {
-    try {
-        const images = await Image.find();
-        const imagesWithUrls = images.map(image => {
-            // Construct the correct URL for image access
-            const imageUrl = `${process.env.BASE_URL || `https://${req.headers.host}/uploads`}/${image.image}`;
-            return {
-                id: image._id,
-                url: imageUrl
-            };
-        });
-        res.json(imagesWithUrls);
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Failed to fetch images' });
-    }
-});
-
-// Delete Image
-app.delete('/api/images/:id', async (req, res) => {
-    try {
-        const image = await Image.findById(req.params.id);
-        if (!image) {
-            return res.status(404).json({ error: 'Image not found' });
-        }
-
-        const filePath = path.join(__dirname, 'uploads', image.image);
-        fs.unlink(filePath, (err) => {
-            if (err) {
-                console.error(err);
-                return res.status(500).json({ error: 'Failed to delete image file' });
-            }
-        });
-
-        await Image.findByIdAndDelete(req.params.id);
-        res.json({ message: 'Image deleted successfully' });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Failed to delete image' });
-    }
-});
-
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
